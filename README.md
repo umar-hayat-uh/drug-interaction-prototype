@@ -1,7 +1,7 @@
 # Drug Interaction Model Prototype
 
 This repository is a lightweight prototype scaffold for the AI-powered drug interaction checker
-(Science Fair project). It was generated automatically as a starting point — **you should adapt and
+(Science Fair project). It was made as a starting point — **you should adapt and
 validate everything before using any output in a real/clinical setting**.
 
 ## What I included
@@ -62,6 +62,3 @@ streamlit run src/app_streamlit.py
 - Model improvements: hyperparameter tuning, calibration, multi-label handling.
 - Validation: cross-validation, external test sets, precision/recall by severity.
 - Explainability: SHAP to show which features drove predictions.
-
-## Source & provenance
-Original project roadmap was provided by the user and a cleaned DrugBank CSV (see included/excluded fields).
