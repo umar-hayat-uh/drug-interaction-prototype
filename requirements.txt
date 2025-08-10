@@ -1,0 +1,11 @@
+pandas
+scikit-learn
+xgboost
+joblib
+streamlit
+flask
+numpy
+matplotlib
+# Optional / advanced (may require extra OS packages):
+# rdkit - chemical fingerprints (install via conda or rdkit-pypi with caution)
+# rdkit-pypi
