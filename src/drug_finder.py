@@ -10,7 +10,7 @@ def drug_finder_ui():
     data_path = Path(__file__).parent.parent / "data" / "DrugData.csv"
     df = pd.read_csv(data_path)
 
-    # Keep only required fields: Drug Name → Manufacturer
+    # Keep only required fields
     selected_columns = [
         'Drug Name',
         'Generic Name',
@@ -30,8 +30,12 @@ def drug_finder_ui():
     ]
     df = df[selected_columns]
 
-    # Search input
-    query = st.text_input("Enter drug name, generic, or class:")
+    # Create dropdown options
+    options = sorted(set(df['Drug Name'].dropna()) | set(df['Generic Name'].dropna()) | set(df['Drug Class'].dropna()))
+
+    # Dropdown input
+    query = st.selectbox("Select a drug, generic, or class:", [""] + options)
+
     view_mode = st.radio("View mode:", ["Table", "Vertical (Mobile-friendly)"], horizontal=True)
 
     if query:
