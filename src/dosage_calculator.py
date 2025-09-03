@@ -1,57 +1,58 @@
+# src/dosage_calculator.py
 import streamlit as st
 
-def convert_to_mg(value, unit):
-    unit = unit.lower()
-    if unit in ['g', 'gram', 'grams']:
-        return value * 1000
-    elif unit in ['mcg', 'microgram', 'micrograms']:
-        return value / 1000
-    elif unit in ['mg', 'milligram', 'milligrams']:
-        return value
-    else:
-        raise ValueError(f"Invalid unit: {unit}")
-
-def convert_weight_to_kg(value, unit):
-    unit = unit.lower()
-    if unit in ['lb', 'pound', 'pounds']:
-        return value * 0.453592
-    elif unit in ['kg', 'kilogram', 'kilograms']:
-        return value
-    else:
-        raise ValueError(f"Invalid weight unit: {unit}")
-
 def dosage_calculator_ui():
+    st.set_page_config(page_title="⚖️ Weight-Based Dosage Calculator", layout="wide")
+
     st.title("⚖️ Weight-Based Dosage Calculator")
     st.caption("Prototype only — not for clinical use.")
 
-    weight_value = st.number_input("Patient Weight", min_value=0, step=1)
-    weight_unit = st.selectbox("Weight Unit", ["kg", "lb"])
+    # -----------------------
+    # Solid Form (Tablets)
+    # -----------------------
+    st.subheader("💊 Solid Dosage (Tablet/Capsule)")
 
-    dose_per_kg_value = st.number_input("Dosage per kg (daily)", min_value=0, step=1)
-    dose_per_kg_unit = st.selectbox("Dosage Unit", ["mg", "mcg", "g"])
+    with st.form("solid_form"):
+        weight = st.number_input("Patient Weight", min_value=1.0, value=25.0, step=0.5)
+        dosage_per_kg = st.number_input("Dose per mg/kg", min_value=0.0, value=15.0, step=0.5)
+        tablet_strength = st.number_input("Tablet strength (mg per tablet)", min_value=1.0, value=250.0, step=1.0)
+        frequency = st.selectbox("Frequency", ["Once/day", "Twice/day", "Three times/day", "Four times/day"])
 
-    frequency = st.selectbox("Frequency", [
-        "Once per day", "Twice per day", "Three times/day", "Four times/day",
-        "Every 4 hours", "Every 3 hours", "Every 2 hours", "Every hour"
-    ])
+        solid_submit = st.form_submit_button("Calculate Solid Dose")
 
-    freq_map = {
-        "Once per day": 1,
-        "Twice per day": 2,
-        "Three times/day": 3,
-        "Four times/day": 4,
-        "Every 4 hours": 6,
-        "Every 3 hours": 8,
-        "Every 2 hours": 12,
-        "Every hour": 24
-    }
+    if solid_submit:
+        freq_map = {"Once/day": 1, "Twice/day": 2, "Three times/day": 3, "Four times/day": 4}
+        total_daily_dose = weight * dosage_per_kg
+        single_dose = total_daily_dose / freq_map[frequency]
+        tablets_needed = single_dose / tablet_strength
 
-    if weight_value > 0 and dose_per_kg_value > 0:
-        weight_kg = convert_weight_to_kg(weight_value, weight_unit)
-        daily_dose_mg = weight_kg * convert_to_mg(dose_per_kg_value, dose_per_kg_unit)
-        single_dose_mg = daily_dose_mg / freq_map[frequency]
+        st.success(f"""
+        📅 **Total Daily Dose**: {total_daily_dose:.2f} mg  
+        💊 **Single Dose**: {single_dose:.2f} mg  
+        🔢 **Tablets per dose**: {tablets_needed:.2f} tablets
+        """)
 
-        st.success(
-            f"💉 **Single Dose:** {single_dose_mg:.2f} mg\n"
-            f"📅 **Total Daily Dose:** {daily_dose_mg:.2f} mg"
-        )
+    # -----------------------
+    # Liquid Form (Syrup)
+    # -----------------------
+    st.subheader("🧴 Liquid Dosage (Syrup)")
+
+    with st.form("liquid_form"):
+        weight_liquid = st.number_input("Patient Weight (kg)", min_value=1.0, value=25.0, step=0.5, key="liquid_weight")
+        dosage_per_kg_liquid = st.number_input("Dosage per kg (daily)", min_value=0.0, value=15.0, step=0.5, key="liquid_dosage")
+        concentration = st.number_input("Concentration (mg/ml)", min_value=1.0, value=125.0, step=1.0)
+        frequency_liquid = st.selectbox("Frequency", ["Once/day", "Twice/day", "Three times/day", "Four times/day"], key="liquid_freq")
+
+        liquid_submit = st.form_submit_button("Calculate Liquid Dose")
+
+    if liquid_submit:
+        freq_map = {"Once/day": 1, "Twice/day": 2, "Three times/day": 3, "Four times/day": 4}
+        total_daily_dose = weight_liquid * dosage_per_kg_liquid
+        single_dose = total_daily_dose / freq_map[frequency_liquid]
+        volume_ml = single_dose / concentration
+
+        st.success(f"""
+        📅 **Total Daily Dose**: {total_daily_dose:.2f} mg  
+        💉 **Single Dose**: {single_dose:.2f} mg  
+        🧪 **Volume per dose**: {volume_ml:.2f} ml
+        """)

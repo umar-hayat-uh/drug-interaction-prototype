@@ -1,74 +1,140 @@
 import streamlit as st
-import pandas as pd
-import joblib
+import json
+import re
 from pathlib import Path
-from sklearn.preprocessing import LabelEncoder
 
 def drug_interaction_checker_ui():
-    data_dir = Path('data')
-    model_path = Path('models/xgb_model.joblib')
-    processed_csv = data_dir / "processed.csv"
-    original_csv = data_dir / "db_drug_interactions.csv"
+    json_path = Path("data/drug-interactions.json")
 
     @st.cache_data
-    def load_label_encoder_and_severity_map():
-        df = pd.read_csv(processed_csv)
-        drugs = pd.Series(list(df['Drug 1']) + list(df['Drug 2'])).str.strip().str.lower()
-        le_drug = LabelEncoder()
-        le_drug.fit(drugs.astype(str))
+    def load_interactions_json():
+        with open(json_path, "r") as f:
+            data = json.load(f)
+        return data["drug_interactions"]
 
-        severity_labels = df['severity'].fillna('unknown').astype(str).unique()
-        le_sev = LabelEncoder()
-        le_sev.fit(severity_labels)
-        severity_map = {code: label for code, label in enumerate(le_sev.classes_)}
-        return le_drug, severity_map
+    drug_interactions = load_interactions_json()
 
-    @st.cache_data
-    def load_interactions():
-        df = pd.read_csv(original_csv)
-        df['Drug 1 norm'] = df['Drug 1'].str.strip().str.lower()
-        df['Drug 2 norm'] = df['Drug 2'].str.strip().str.lower()
-        return df
+    # Collect all unique drugs
+    all_drugs = set()
+    for severity in ["major", "moderate", "minor"]:
+        for item in drug_interactions.get(severity, []):
+            all_drugs.add(item["drug_a"])
+            all_drugs.add(item["drug_b"])
 
-    @st.cache_resource
-    def load_model():
-        return joblib.load(model_path)
-
-    le_drug, severity_map = load_label_encoder_and_severity_map()
-    model = load_model()
-    interactions_df = load_interactions()
-
-    st.subheader("Check Drug Interaction")
+    st.subheader("💊 Drug Interaction Checker")
     col1, col2 = st.columns(2)
     with col1:
-        drug1_input = st.text_input("Drug 1")
+        drug1 = st.selectbox("Select Drug 1", sorted(all_drugs))
     with col2:
-        drug2_input = st.text_input("Drug 2")
+        interacting_drugs = set()
+        for severity in ["major", "moderate", "minor"]:
+            for item in drug_interactions.get(severity, []):
+                if item["drug_a"] == drug1:
+                    interacting_drugs.add(item["drug_b"])
+                elif item["drug_b"] == drug1:
+                    interacting_drugs.add(item["drug_a"])
+        drug2 = st.selectbox("Select Drug 2", sorted(interacting_drugs))
+
+    # Disclaimer
+    st.markdown(
+        """
+        <div style="
+            border:2px solid #f28b82;
+            background-color:#fdecea;
+            padding:12px;
+            border-radius:10px;
+            margin:15px 0;
+            color:#b71c1c;
+            font-size:15px;
+        ">
+        ⚠️ <strong>Warning:</strong> If no interactions are found between two drugs, it does not necessarily mean that no interactions exist. Always consult with a healthcare professional.
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
     if st.button("Check Interaction"):
-        if not drug1_input or not drug2_input:
-            st.warning("Please enter both drug names.")
+        if not drug1 or not drug2:
+            st.warning("⚠️ Please select both drugs.")
             return
 
-        d1_norm = drug1_input.strip().lower()
-        d2_norm = drug2_input.strip().lower()
+        # Find the interaction
+        interaction = None
+        for severity in ["major", "moderate", "minor"]:
+            for item in drug_interactions.get(severity, []):
+                if (item["drug_a"] == drug1 and item["drug_b"] == drug2) or \
+                   (item["drug_b"] == drug1 and item["drug_a"] == drug2):
+                    interaction = item
+                    break
+            if interaction:
+                break
 
-        if d1_norm not in le_drug.classes_ or d2_norm not in le_drug.classes_:
-            st.error("One or both drugs not found in database.")
-            return
+        if interaction:
+            severity = interaction['severity'].lower()
+            color_map = {
+                "major": "#ff6961",      # red
+                "moderate": "#ffb347",   # orange
+                "minor": "#fef68a"       # yellow
+            }
+            bg_color = color_map.get(severity, "#d3d3d3")
 
-        d1_enc = le_drug.transform([d1_norm])[0] # type: ignore
-        d2_enc = le_drug.transform([d2_norm])[0] # type: ignore
+            # Clean text only for minor interactions
+            def clean_text(value):
+                if not isinstance(value, str):
+                    return value
+                value = re.sub(r"</?div.*?>", "", value, flags=re.IGNORECASE)
+                value = re.sub(r"<.*?>", "", value)
+                return value.strip()
 
-        pred_proba = model.predict_proba([[d1_enc, d2_enc]])
-        pred_label = pred_proba.argmax(axis=1)[0]
-        severity_str = severity_map.get(pred_label, "unknown")
+            mechanism = interaction.get('mechanism', 'N/A')
+            effect = interaction.get('effect', 'N/A')
+            safer_alt = interaction.get('Safer_alternative')
+            rationale = interaction.get('rationale', 'N/A')
+            reference = interaction.get('reference', 'N/A')
 
-        cond1 = (interactions_df['Drug 1 norm'] == d1_norm) & (interactions_df['Drug 2 norm'] == d2_norm)
-        cond2 = (interactions_df['Drug 1 norm'] == d2_norm) & (interactions_df['Drug 2 norm'] == d1_norm)
-        filtered = interactions_df[cond1 | cond2]
+            if severity == "minor":
+                mechanism = clean_text(mechanism)
+                effect = clean_text(effect)
+                safer_alt = clean_text(safer_alt) if safer_alt else None
+                rationale = clean_text(rationale)
+                reference = clean_text(reference)
 
-        description = filtered.iloc[0]['Interaction Description'] if not filtered.empty else "No detailed description found."
+            # Build HTML
+            details_html = f"<p><strong>Mechanism:</strong> {mechanism}</p>"
+            details_html += f"<p><strong>Effect:</strong> {effect}</p>"
+            if severity in ["major", "moderate"] and safer_alt:
+                details_html += f"<p><strong>Safer Alternative:</strong> {safer_alt}</p>"
+            details_html += f"<p><strong>Rationale:</strong> {rationale}</p>"
+            details_html += f"<p><strong>Reference:</strong> {reference}</p>"
 
-        st.markdown(f"**Predicted severity:** `{severity_str.upper()}`")
-        st.info(description)
+            st.markdown(
+                f"""
+                <div style="
+                    border-radius: 12px;
+                    padding: 20px;
+                    background-color: #f9f9f9;
+                    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+                    margin-bottom: 20px;
+                ">
+                    <h2 style="margin-top:0;">💊 {drug1} ↔ {drug2}</h2>
+                    <div style="
+                        display:flex;
+                        align-items:center;
+                        gap:10px;
+                        margin-bottom:15px;
+                    ">
+                        <span style="
+                            padding:5px 10px;
+                            border-radius:5px;
+                            background-color:{bg_color};
+                            font-weight:bold;
+                            color:#000;
+                        ">{interaction['severity'].upper()}</span>
+                    </div>
+                    {details_html}
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+        else:
+            st.info("✅ No known interaction found between these drugs.")
