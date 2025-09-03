@@ -17,8 +17,7 @@ page = st.sidebar.radio(
         "🏠 Home",
         "⚠️ Drug Interaction Checker",
         "📏 Dosage Calculator",
-        "📚 Drug Encyclopedia",
-        "💎 Completeness Checker",
+        "📚 Pharmacopedia",
         "🔍 Drug Finder",
         "🦠 AMR Checker",
         "🧠 Pharm AI"
@@ -51,10 +50,6 @@ elif page == "📏 Dosage Calculator":
 elif page == "📚 Pharmacopedia":
     from drug_encyclopedia import drug_encyclopedia_ui
     drug_encyclopedia_ui()
-
-elif page == "💎 Completeness Checker":
-    from drug_completeness_checker import drug_completeness_checker_ui
-    drug_completeness_checker_ui()
 
 elif page == "🔍 Drug Finder":
     from drug_finder import drug_finder_ui
